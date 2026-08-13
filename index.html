@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Фотограм</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 0 30px;
+
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .primary {
+            background: #111;
+            color: white;
+        }
+
+        .danger {
+            background: #e53935;
+            color: white;
+        }
+
+        main {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 7px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .post img {
+            width: 100%;
+            max-height: 600px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .user {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-buttons {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .comments {
+            margin-top: 15px;
+        }
+
+        .comment {
+            padding: 7px 0;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+
+        .mine {
+            margin-left: auto;
+            background: #111;
+            color: white;
+        }
+
+        .theirs {
+            background: #eee;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        @media(max-width:600px) {
+
+            header {
+                padding: 0 12px;
+            }
+
+            .logo {
+                font-size: 20px;
+            }
+
+            main {
+                margin-top: 15px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+
+<header>
+
+    <div class="logo">
+        📷 Фотограм
+    </div>
+
+    <div id="headerUser"></div>
+
+</header>
+
+<main>
+
+    <!-- РЕГИСТРАЦИЯ / ВХОД -->
+
+    <section
+        id="auth"
+        class="card"
+    >
+
+        <h2>Добро пожаловать в Фотограм</h2>
+
+        <input
+            id="username"
+            placeholder="Имя пользователя"
+        >
+
+        <input
+            id="password"
+            type="password"
+            placeholder="Пароль"
+        >
+
+        <div class="tabs">
+
+            <button
+                class="primary"
+                onclick="register()"
+            >
+                Зарегистрироваться
+            </button>
+
+            <button
+                onclick="login()"
+            >
+                Войти
+            </button>
+
+        </div>
+
+        <p id="authMessage"></p>
+
+    </section>
+
+
+    <!-- ОСНОВНОЙ САЙТ -->
+
+    <section
+        id="app"
+        class="hidden"
+    >
+
+        <div class="tabs">
+
+            <button onclick="showPosts()">
+                🏠 Главная
+            </button>
+
+            <button onclick="showUsers()">
+                👥 Пользователи
+            </button>
+
+            <button onclick="showFriends()">
+                🤝 Друзья
+            </button>
+
+            <button onclick="showRequests()">
+                🔔 Заявки
+            </button>
+
+            <button onclick="showCreatePost()">
+                ➕ Пост
+            </button>
+
+            <button onclick="logout()">
+                Выйти
+            </button>
+
+        </div>
+
+
+        <!-- СОЗДАНИЕ ПОСТА -->
+
+        <div
+            id="createPost"
+            class="card hidden"
+        >
+
+            <h2>Новый пост</h2>
+
+            <input
+                id="photo"
+                type="file"
+                accept="image/*"
+            >
+
+            <textarea
+                id="caption"
+                placeholder="Напишите описание..."
+            ></textarea>
+
+            <button
+                class="primary"
+                onclick="createPost()"
+            >
+                Опубликовать
+            </button>
+
+        </div>
+
+
+        <!-- КОНТЕНТ -->
+
+        <div id="content"></div>
+
+    </section>
+
+</main>
+
+
+<script>
+
+let currentUser = null;
+let selectedChat = null;
+
+
+// =================================
+// API
+// =================================
+
+async function api(url, options = {}) {
+
+    const response = await fetch(url, options);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || "Ошибка");
+    }
+
+    return data;
+}
+
+
+// =================================
+// РЕГИСТРАЦИЯ
+// =================================
+
+async function register() {
+
+    const username =
+        document.getElementById("username").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    try {
+
+        await api("/api/register", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                username,
+                password
+            })
+
+        });
+
+        await loadMe();
+
+    } catch(error) {
+
+        document.getElementById("authMessage")
+            .textContent = error.message;
+    }
+}
+
+
+// =================================
+// ВХОД
+// =================================
+
+async function login() {
+
+    const username =
+        document.getElementById("username").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    try {
+
+        await api("/api/login", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                username,
+                password
+            })
+
+        });
+
+        await loadMe();
+
+    } catch(error) {
+
+        document.getElementById("authMessage")
+            .textContent = error.message;
+    }
+}
+
+
+// =================================
+// ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ
+// =================================
+
+async function loadMe() {
+
+    try {
+
+        const data =
+            await api("/api/me");
+
+        currentUser = data.user;
+
+        document
+            .getElementById("auth")
+            .classList.add("hidden");
+
+        document
+            .getElementById("app")
+            .classList.remove("hidden");
+
+        document
+            .getElementById("headerUser")
+            .textContent =
+            "@" + currentUser.username;
+
+        showPosts();
+
+    } catch {
+
+        // Пользователь не вошёл
+    }
+}
+
+
+// =================================
+// ВЫХОД
+// =================================
+
+async function logout() {
+
+    await api("/api/logout", {
+        method: "POST"
+    });
+
+    location.reload();
+}
+
+
+// =================================
+// ПОСТЫ
+// =================================
+
+async function showPosts() {
+
+    hideCreate();
+
+    const data =
+        await api("/api/posts");
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <h2>Лента</h2>
+    `;
+
+    for (const post of data.posts) {
+
+        const comments =
+            await api(
+                `/api/posts/${post.id}/comments`
+            );
+
+        const commentsHTML =
+            comments.comments.map(comment => `
+                <div class="comment">
+                    <b>@${escapeHTML(comment.username)}</b>
+                    ${escapeHTML(comment.text)}
+                </div>
+            `).join("");
+
+        content.innerHTML += `
+
+            <div class="card post">
+
+                <b>@${escapeHTML(post.username)}</b>
+
+                <img
+                    src="${post.image}"
+                    alt="Фото"
+                >
+
+                <p>
+                    ${escapeHTML(post.caption)}
+                </p>
+
+                <div class="post-actions">
+
+                    <button
+                        onclick="likePost(${post.id})"
+                    >
+                        ❤️ ${post.likes}
+                    </button>
+
+                </div>
+
+                <div class="comments">
+
+                    <h4>Комментарии</h4>
+
+                    ${commentsHTML}
+
+                    <input
+                        id="comment-${post.id}"
+                        placeholder="Написать комментарий..."
+                    >
+
+                    <button
+                        onclick="commentPost(${post.id})"
+                    >
+                        Отправить
+                    </button>
+
+                </div>
+
+            </div>
+        `;
+    }
+}
+
+
+// =================================
+// ЛАЙК
+// =================================
+
+async function likePost(id) {
+
+    await api(
+        `/api/posts/${id}/like`,
+        {
+            method: "POST"
+        }
+    );
+
+    showPosts();
+}
+
+
+// =================================
+// КОММЕНТАРИЙ
+// =================================
+
+async function commentPost(id) {
+
+    const input =
+        document.getElementById(
+            `comment-${id}`
+        );
+
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    await api(
+        `/api/posts/${id}/comments`,
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                text
+            })
+        }
+    );
+
+    showPosts();
+}
+
+
+// =================================
+// СОЗДАНИЕ ПОСТА
+// =================================
+
+function showCreatePost() {
+
+    document
+        .getElementById("createPost")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("content")
+        .innerHTML = "";
+}
+
+
+function hideCreate() {
+
+    document
+        .getElementById("createPost")
+        .classList.add("hidden");
+}
+
+
+async function createPost() {
+
+    const file =
+        document.getElementById("photo").files[0];
+
+    const caption =
+        document.getElementById("caption").value;
+
+    if (!file) {
+
+        alert("Выберите фотографию");
+
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("image", file);
+    formData.append("caption", caption);
+
+    try {
+
+        await api("/api/posts", {
+
+            method: "POST",
+
+            body: formData
+
+        });
+
+        document.getElementById("photo").value = "";
+        document.getElementById("caption").value = "";
+
+        showPosts();
+
+    } catch(error) {
+
+        alert(error.message);
+    }
+}
+
+
+// =================================
+// ПОЛЬЗОВАТЕЛИ
+// =================================
+
+async function showUsers() {
+
+    hideCreate();
+
+    const data =
+        await api("/api/users");
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <div class="card">
+            <h2>Пользователи</h2>
+            <div id="users"></div>
+        </div>
+    `;
+
+    const users =
+        document.getElementById("users");
+
+    for (const user of data.users) {
+
+        users.innerHTML += `
+
+            <div class="user">
+
+                <b>
+                    👤 @${escapeHTML(user.username)}
+                </b>
+
+                <div class="user-buttons">
+
+                    <button
+                        onclick="addFriend(${user.id})"
+                    >
+                        🤝 Добавить
+                    </button>
+
+                    <button
+                        onclick="openChat(${user.id}, '${escapeAttribute(user.username)}')"
+                    >
+                        💬 Написать
+                    </button>
+
+                    <button
+                        onclick="callUser('${escapeAttribute(user.username)}')"
+                    >
+                        📞 Позвонить
+                    </button>
+
+                </div>
+
+            </div>
+        `;
+    }
+}
+
+
+// =================================
+// ДОБАВИТЬ В ДРУЗЬЯ
+// =================================
+
+async function addFriend(userId) {
+
+    try {
+
+        await api(
+            "/api/friends/request",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    userId
+                })
+            }
+        );
+
+        alert("Заявка отправлена!");
+
+    } catch(error) {
+
+        alert(error.message);
+    }
+}
+
+
+// =================================
+// ДРУЗЬЯ
+// =================================
+
+async function showFriends() {
+
+    hideCreate();
+
+    const data =
+        await api("/api/friends");
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <div class="card">
+
+            <h2>🤝 Мои друзья</h2>
+
+            ${
+                data.friends.length
+                ? ""
+                : "<p>Пока нет друзей.</p>"
+            }
+
+            <div id="friends"></div>
+
+        </div>
+    `;
+
+    const friends =
+        document.getElementById("friends");
+
+    for (const friend of data.friends) {
+
+        friends.innerHTML += `
+
+            <div class="user">
+
+                <b>
+                    @${escapeHTML(friend.username)}
+                </b>
+
+                <button
+                    onclick="openChat(${friend.id}, '${escapeAttribute(friend.username)}')"
+                >
+                    💬 Написать
+                </button>
+
+            </div>
+        `;
+    }
+}
+
+
+// =================================
+// ЗАЯВКИ
+// =================================
+
+async function showRequests() {
+
+    hideCreate();
+
+    const data =
+        await api("/api/friends/requests");
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <div class="card">
+
+            <h2>🔔 Заявки в друзья</h2>
+
+            <div id="requests"></div>
+
+        </div>
+    `;
+
+    const requests =
+        document.getElementById("requests");
+
+    if (!data.requests.length) {
+
+        requests.innerHTML =
+            "<p>Новых заявок нет.</p>";
+
+        return;
+    }
+
+    for (const request of data.requests) {
+
+        requests.innerHTML += `
+
+            <div class="user">
+
+                <b>
+                    @${escapeHTML(request.username)}
+                </b>
+
+                <button
+                    onclick="acceptFriend(${request.userId})"
+                >
+                    ✅ Принять
+                </button>
+
+            </div>
+        `;
+    }
+}
+
+
+// =================================
+// ПРИНЯТЬ ДРУГА
+// =================================
+
+async function acceptFriend(userId) {
+
+    await api(
+        "/api/friends/accept",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                userId
+            })
+        }
+    );
+
+    showRequests();
+}
+
+
+// =================================
+// ЧАТ
+// =================================
+
+async function openChat(userId, username) {
+
+    hideCreate();
+
+    selectedChat = userId;
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+
+        <div class="card">
+
+            <h2>
+                💬 Чат с @${escapeHTML(username)}
+            </h2>
+
+            <div id="chat"></div>
+
+            <input
+                id="message"
+                placeholder="Написать сообщение..."
+                onkeydown="if(event.key === 'Enter') sendMessage()"
+            >
+
+            <button
+                class="primary"
+                onclick="sendMessage()"
+            >
+                Отправить
+            </button>
+
+        </div>
+    `;
+
+    await loadMessages();
+}
+
+
+async function loadMessages() {
+
+    const data =
+        await api(
+            `/api/messages/${selectedChat}`
+        );
+
+    const chat =
+        document.getElementById("chat");
+
+    chat.innerHTML = "";
+
+    for (const message of data.messages) {
+
+        const div =
+            document.createElement("div");
+
+        div.className =
+            "message " +
+            (
+                message.sender_id === currentUser.id
+                ? "mine"
+                : "theirs"
+            );
+
+        div.textContent =
+            message.text;
+
+        chat.appendChild(div);
+    }
+}
+
+
+// =================================
+// ОТПРАВИТЬ СООБЩЕНИЕ
+// =================================
+
+async function sendMessage() {
+
+    const input =
+        document.getElementById("message");
+
+    const text =
+        input.value.trim();
+
+    if (!text || !selectedChat) return;
+
+    await api(
+        "/api/messages",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                userId: selectedChat,
+                text
+            })
+        }
+    );
+
+    input.value = "";
+
+    await loadMessages();
+}
+
+
+// =================================
+// ЗВОНОК
+// =================================
+
+function callUser(username) {
+
+    alert(
+        `📞 Звоним пользователю @${username}...\n\n` +
+        `Настоящие аудио- и видеозвонки мы подключим через WebRTC.`
+    );
+}
+
+
+// =================================
+// ЗАЩИТА HTML
+// =================================
+
+function escapeHTML(text) {
+
+    return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+function escapeAttribute(text) {
+
+    return String(text)
+        .replaceAll("\\", "\\\\")
+        .replaceAll("'", "\\'");
+}
+
+
+// =================================
+// ЗАПУСК
+// =================================
+
+loadMe();
+
+</script>
+
+</body>
+</html>
